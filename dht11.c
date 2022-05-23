@@ -11,10 +11,9 @@
 #include <linux/kernel.h>
 #include <linux/printk.h>
 #include <linux/slab.h>
-#include <linux/of.h>
-#include <linux/of_device.h>
 #include <linux/sysfs.h>
 #include <linux/io.h>
+#include <linux/mod_devicetable.h>
 #include <linux/module.h>
 #include <linux/platform_device.h>
 #include <linux/wait.h>
@@ -39,10 +38,6 @@
  */
 #define DHT11_EDGES_PER_READ (2 * DHT11_BITS_PER_READ + \
 			      DHT11_EDGES_PREAMBLE + 1)
-
-#ifdef DEBUG
-#define CONFIG_DYNAMIC_DEBUG
-#endif
 
 /*
  * Data transmission timing:
@@ -161,7 +156,7 @@ static int dht11_decode(struct dht11 *dht11, int offset)
 		dht11->temperature = temp_int * 1000;
 		dht11->humidity = hum_int * 1000;
 	} else {
-		dev_dbg(dht11->dev,
+		dev_err(dht11->dev,
 			"Don't know how to decode data: %d %d %d %d\n",
 			hum_int, hum_dec, temp_int, temp_dec);
 		return -EIO;
@@ -182,9 +177,7 @@ static irqreturn_t dht11_handle_irq(int irq, void *data)
 	if (dht11->num_edges < DHT11_EDGES_PER_READ && dht11->num_edges >= 0) {
 		dht11->edges[dht11->num_edges].ts = ktime_get_boottime_ns();
 		value = gpiod_get_value(dht11->gpiod);
-		if (dht11->num_edges == 0) {
-			dht11->edges[dht11->num_edges++].value = value;
-		} else if (value != dht11->edges[dht11->num_edges-1].value) {
+		if (dht11->num_edges == 0 || value != dht11->edges[dht11->num_edges-1].value) {
 			dht11->edges[dht11->num_edges++].value = value;
 		}
 
@@ -248,9 +241,8 @@ static int dht11_read_raw(struct iio_dev *iio_dev,
 		dht11_edges_print(dht11);
 #endif
 
-		/* It's OK even if we lost first three edges. */
-		if (ret == 0 && dht11->num_edges < DHT11_EDGES_PER_READ - 3) {
-			dev_dbg(dht11->dev, "Only %d signal edges detected\n",
+		if (ret == 0 && dht11->num_edges < DHT11_EDGES_PER_READ - 1) {
+			dev_err(dht11->dev, "Only %d signal edges detected\n",
 				dht11->num_edges);
 			ret = -ETIMEDOUT;
 		}
@@ -259,8 +251,7 @@ static int dht11_read_raw(struct iio_dev *iio_dev,
 
 		offset = DHT11_EDGES_PREAMBLE +
 				dht11->num_edges - DHT11_EDGES_PER_READ;
-		for (; offset >= -1; --offset) {
-			dev_dbg(dht11->dev, "Offset: %d\n", offset);
+		for (; offset >= 0; --offset) {
 			ret = dht11_decode(dht11, offset);
 			if (!ret)
 				break;
