@@ -217,6 +217,7 @@ static int dht11_read_raw(struct iio_dev *iio_dev,
 		reinit_completion(&dht11->completion);
 
 		dht11->num_edges = 0;
+		dht11->timestamp = ktime_get_boottime_ns();
 		ret = gpiod_direction_output(dht11->gpiod, 0);
 		if (ret)
 			goto err;
