@@ -37,7 +37,7 @@
  * since the last edge is not significant, we only store 83:
  */
 #define DHT11_EDGES_PER_READ (2 * DHT11_BITS_PER_READ + \
-			      DHT11_EDGES_PREAMBLE + 1)
+			      DHT11_EDGES_PREAMBLE + 2)
 
 /*
  * Data transmission timing:
